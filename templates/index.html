@@ -710,7 +710,13 @@
                     option.value = format.format_id;
                     
                     let icon = '🎬';
-                    if (format.vcodec === 'none' && format.acodec !== 'none') icon = '🎵';
+                    let formatType = 'Video+Audio';
+                    if (format.vcodec === 'none' && format.acodec !== 'none') {
+                        icon = '🎵';
+                        formatType = 'Audio only';
+                    } else if (format.acodec === 'none' && format.vcodec !== 'none') {
+                        formatType = 'Video only';
+                    }
                     if (format.ext === 'mp3') icon = '🔊';
                     
                     const bestTag = index === 0 ? ' [RECOMMENDED]' : '';
@@ -719,6 +725,7 @@
                     if (format.audio_only_mp3) {
                         option.dataset.audioMp3 = 'true';
                     }
+                    option.dataset.formatType = formatType;
                     
                     formatSelect.appendChild(option);
                 });
@@ -751,12 +758,13 @@
             }
 
             const audioOnlyMp3 = formatSelect.selectedOptions[0]?.dataset.audioMp3 === 'true';
+            const formatType = formatSelect.selectedOptions[0]?.dataset.formatType || 'unknown';
 
             try {
                 const res = await fetch('/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, format_id: formatId, audio_only_mp3: audioOnlyMp3 })
+                    body: JSON.stringify({ url, format_id: formatId, audio_only_mp3: audioOnlyMp3, format_type: formatType })
                 });
 
                 const data = await res.json();

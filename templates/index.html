@@ -120,6 +120,22 @@
             66% { transform: translate(-20px, 20px) rotate(240deg); }
         }
 
+        /* Performance optimization: Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            
+            body::before,
+            .particle,
+            .progress-bar::after,
+            .main-card::after {
+                animation: none !important;
+            }
+        }
+
         .particles {
             position: fixed;
             top: 0;
@@ -500,17 +516,6 @@
             transform: none;
         }
 
-        .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-            width: 100%;
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-primary);
-            border-color: var(--accent);
-        }
 
         .loading-spinner {
             width: 20px;
@@ -552,7 +557,7 @@
 
         .format-select:focus {
             outline: none;
-            border-color: var(--accent);
+            border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
@@ -794,14 +799,14 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            color: var(--accent);
+            color: var(--primary);
             text-decoration: none;
             font-weight: 600;
             transition: var(--transition);
         }
 
         .download-link:hover {
-            color: var(--accent-hover);
+            color: var(--primary-light);
             transform: translateX(5px);
         }
 
@@ -832,8 +837,8 @@
             padding: 3rem;
             border-radius: var(--radius-lg);
             text-align: center;
-            border: 2px dashed var(--accent);
-            color: var(--accent);
+            border: 2px dashed var(--primary);
+            color: var(--primary);
             font-size: 1.25rem;
             font-weight: 600;
         }

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Video Downloader</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body {background:#f0f2f5;font-family:'Segoe UI',sans-serif;}
+.card{max-width:650px;margin:50px auto;padding:30px;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,0.1);}
+input,select,button{font-size:16px;}
+button{transition:0.3s;}
+button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,0.2);}
+.progress{height:25px;margin-top:20px;border-radius:12px;overflow:hidden;}
+.progress-bar{font-weight:bold;}
+.badge-status{margin-top:15px;font-size:0.9rem;}
+.spinner-border{width:1.5rem;height:1.5rem;margin-left:10px;}
+</style>
+</head>
+<body>
+<div class="card text-center">
+<h2 class="mb-4">🎥 Video Downloader</h2>
+<div class="mb-3">
+<input type="text" id="url" class="form-control" placeholder="Paste video URL here" />
+</div>
+<button class="btn btn-primary w-100 mb-3" onclick="fetchFormats()" id="fetchBtn">
+Get Formats <span class="spinner-border text-light hidden" id="loadingSpinner"></span>
+</button>
+<div class="mb-3">
+<select id="formatSelect" class="form-select hidden"></select>
+</div>
+<button class="btn btn-success w-100 hidden" id="downloadBtn" onclick="startDownload()">Download</button>
+<div class="progress hidden" id="progressContainer">
+<div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="progressBar">0%</div>
+</div>
+<div id="status" class="badge-status"></div>
+</div>
+
+<script>
+let currentTask=null;
+
+async function fetchFormats(){
+const url=document.getElementById("url").value.trim();
+if(!url)return alert("Please enter a video URL");
+document.getElementById("status").innerHTML='<span class="badge bg-info">Fetching formats...</span>';
+document.getElementById("loadingSpinner").classList.remove("hidden");
+
+const res=await fetch("/get_formats",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+const data=await res.json();
+document.getElementById("loadingSpinner").classList.add("hidden");
+if(data.error){document.getElementById("status").innerHTML=`<span class="badge bg-danger">Error: ${data.error}</span>`;return;}
+
+const formatSelect=document.getElementById("formatSelect");
+formatSelect.innerHTML="";
+
+const sortedFormats=data.formats.sort((a,b)=>{
+  const score=f=>{
+    let s=0;
+    if(a.vcodec!=="none" && a.acodec!=="none")s+=1000;
+    s+=a.height||0;
+    return s;
+  };
+  return score(b)-score(a);
+});
+
+sortedFormats.forEach((f,idx)=>{
+const opt=document.createElement("option");
+let icon=f.vcodec!=="none" && f.acodec!=="none"?"🎬":f.vcodec==="none" && f.acodec!=="none"?"🎵":f.ext==="mp3"?"🔊":"";
+let bestTag=idx===0?" [BEST]":"";
+opt.value=f.format_id;
+opt.textContent=`${icon} ${f.note}${bestTag}`;
+if(f.audio_only_mp3)opt.dataset.audioMp3=true;
+formatSelect.appendChild(opt);
+});
+
+// Auto-select top option
+if(formatSelect.options.length>0)formatSelect.selectedIndex=0;
+
+formatSelect.classList.remove("hidden");
+document.getElementById("downloadBtn").classList.remove("hidden");
+document.getElementById("status").innerHTML=`<span class="badge bg-success">Formats loaded for: ${data.title}</span>`;
+}
+
+async function startDownload(){
+const url=document.getElementById("url").value.trim();
+const select=document.getElementById("formatSelect");
+const formatId=select.value;
+const audioOnlyMp3=select.selectedOptions[0].dataset.audioMp3==="true";
+if(!url||!formatId)return alert("Please select a format");
+
+document.getElementById("status").innerHTML='<span class="badge bg-info">Starting download...</span>';
+const res=await fetch("/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url,format_id:formatId,audio_only_mp3:audioOnlyMp3})});
+const data=await res.json();
+if(data.error){document.getElementById("status").innerHTML=`<span class="badge bg-danger">Error: ${data.error}</span>`;return;}
+
+currentTask=data.task_id;
+document.getElementById("progressContainer").classList.remove("hidden");
+checkProgress();
+}
+
+async function checkProgress(){
+if(!currentTask)return;
+const res=await fetch("/progress/"+currentTask);
+const data=await res.json();
+if(data.error){document.getElementById("status").innerHTML=`<span class="badge bg-danger">Error: ${data.error}</span>`;return;}
+
+const bar=document.getElementById("progressBar");
+bar.style.width=data.progress+"%";
+bar.textContent=data.progress+"%";
+
+if(data.status==="finished"){
+document.getElementById("status").innerHTML=`<span class="badge bg-success">Download complete:</span> <a href='/file/${currentTask}'>Click here to download file</a>`;
+currentTask=null;
+}
+else if(data.status==="error"){
+document.getElementById("status").innerHTML=`<span class="badge bg-danger">Error: ${data.message}</span>`;
+}
+else{setTimeout(checkProgress,1000);}
+}
+</script>
+</body>
+</html>

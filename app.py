@@ -55,9 +55,39 @@ def download_worker(tid, url, format_id, audio_only_mp3=False):
             except:
                 pass
 
-        # Enhanced quality options for maximum video+audio quality with high resolution and fps
-        # Prioritize combined video+audio formats first, then fallback to separate streams
-        default_format = "best[vcodec^=av01][acodec!=none][height>=2160][fps>30]/best[vcodec^=vp9][acodec!=none][height>=2160][fps>30]/best[vcodec^=av01][acodec!=none][height>=1440][fps>30]/best[vcodec^=vp9][acodec!=none][height>=1440][fps>30]/best[vcodec^=av01][acodec!=none][height>=1080][fps>30]/best[vcodec^=vp9][acodec!=none][height>=1080][fps>30]/best[acodec!=none][height>=1080][fps>30]/best[vcodec^=av01][acodec!=none][height>=2160]/best[vcodec^=vp9][acodec!=none][height>=2160]/best[vcodec^=av01][acodec!=none][height>=1440]/best[vcodec^=vp9][acodec!=none][height>=1440]/best[vcodec^=av01][acodec!=none][height>=1080]/best[vcodec^=vp9][acodec!=none][height>=1080]/best[acodec!=none][height>=1080]/bestvideo[height>=1080]+bestaudio/best"
+        # ULTIMATE quality format selection - Ensures high-quality video+audio merging
+        # Step 1: Try combined video+audio formats (rare but best when available)
+        # Step 2: Merge best video-only + best audio-only streams (most common for high quality)
+        # Step 3: Progressive fallbacks ensuring we always get video+audio
+        default_format = (
+            # First priority: Combined streams with high quality
+            "best[vcodec^=av01][acodec!=none][height>=2160][fps>=60]/"
+            "best[vcodec^=vp9][acodec!=none][height>=2160][fps>=60]/"
+            "best[vcodec^=av01][acodec!=none][height>=1440][fps>=60]/"
+            "best[vcodec^=vp9][acodec!=none][height>=1440][fps>=60]/"
+            "best[vcodec^=av01][acodec!=none][height>=1080][fps>=60]/"
+            "best[vcodec^=vp9][acodec!=none][height>=1080][fps>=60]/"
+            "best[acodec!=none][height>=2160][fps>=60]/"
+            "best[acodec!=none][height>=1440][fps>=60]/"
+            "best[acodec!=none][height>=1080][fps>=60]/"
+            "best[acodec!=none][height>=2160]/"
+            "best[acodec!=none][height>=1440]/"
+            "best[acodec!=none][height>=1080]/"
+            "best[acodec!=none][height>=720]/"
+            # Second priority: MERGE separate video+audio streams (the key improvement!)
+            "bestvideo[height>=2160][fps>=60]+bestaudio[abr>=256]/bestvideo[height>=2160][fps>=60]+bestaudio/"
+            "bestvideo[height>=1440][fps>=60]+bestaudio[abr>=256]/bestvideo[height>=1440][fps>=60]+bestaudio/"
+            "bestvideo[height>=1080][fps>=60]+bestaudio[abr>=256]/bestvideo[height>=1080][fps>=60]+bestaudio/"
+            "bestvideo[height>=2160]+bestaudio[abr>=256]/bestvideo[height>=2160]+bestaudio/"
+            "bestvideo[height>=1440]+bestaudio[abr>=256]/bestvideo[height>=1440]+bestaudio/"
+            "bestvideo[height>=1080]+bestaudio[abr>=256]/bestvideo[height>=1080]+bestaudio/"
+            "bestvideo[height>=720]+bestaudio[abr>=192]/bestvideo[height>=720]+bestaudio/"
+            # Third priority: General high quality with merging
+            "bestvideo[fps>=60]+bestaudio[abr>=256]/bestvideo[fps>=60]+bestaudio/"
+            "bestvideo+bestaudio[abr>=256]/bestvideo+bestaudio/"
+            # Final fallback: Any quality but still merged
+            "best[acodec!=none]/best"
+        )
         
         ydl_opts = {
             "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title).200s-%(id)s.%(ext)s"),
@@ -77,12 +107,24 @@ def download_worker(tid, url, format_id, audio_only_mp3=False):
                 "preferredquality": "320",
             }]
         else:
-            # Optimize settings for best video+audio sync and quality
+            # CRITICAL: Optimize settings for perfect video+audio merging and sync
             ydl_opts["merge_output_format"] = "mkv"  # Best container for high quality codecs
-            # Removed redundant remuxer as merge_output_format handles this
-            # Ensure perfect sync with additional options
+            ydl_opts["prefer_ffmpeg"] = True  # Use ffmpeg for better merging
+            ydl_opts["keepvideo"] = False  # Clean up temp files after merging
+            
+            # Force high-quality audio when merging
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegVideoRemuxer",
+                "preferedformat": "mkv",
+            }]
+            
+            # Enhanced download stability for large merged files
             ydl_opts["fragment_retries"] = 10
             ydl_opts["socket_timeout"] = 30
+            ydl_opts["retries"] = 5
+            
+            # Ensure best quality merging
+            ydl_opts["writesubtitles"] = False  # Skip subs unless requested to avoid issues
 
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)

@@ -55,9 +55,9 @@ def download_worker(tid, url, format_id, audio_only_mp3=False):
             except:
                 pass
 
-        # Enhanced quality options for maximum download quality
-        # Default to highest quality with audio (fixed to avoid silent video)
-        default_format = "bestvideo[vcodec^=av01][height>=1080]+bestaudio[acodec^=opus]/bestvideo[vcodec^=av01][height>=1080]+bestaudio[acodec^=aac]/bestvideo[vcodec^=vp9.2][height>=1080]+bestaudio[acodec^=opus]/bestvideo[vcodec^=vp9.2][height>=1080]+bestaudio[acodec^=aac]/bestvideo[vcodec^=vp9][height>=1080]+bestaudio[acodec^=opus]/bestvideo[vcodec^=vp9][height>=1080]+bestaudio[acodec^=aac]/bestvideo[height>=1080]+bestaudio/best"
+        # Enhanced quality options for maximum video+audio quality with high resolution and fps
+        # Prioritize combined video+audio formats first, then fallback to separate streams
+        default_format = "best[vcodec^=av01][acodec!=none][height>=2160][fps>30]/best[vcodec^=vp9][acodec!=none][height>=2160][fps>30]/best[vcodec^=av01][acodec!=none][height>=1440][fps>30]/best[vcodec^=vp9][acodec!=none][height>=1440][fps>30]/best[vcodec^=av01][acodec!=none][height>=1080][fps>30]/best[vcodec^=vp9][acodec!=none][height>=1080][fps>30]/best[acodec!=none][height>=1080][fps>30]/best[vcodec^=av01][acodec!=none][height>=2160]/best[vcodec^=vp9][acodec!=none][height>=2160]/best[vcodec^=av01][acodec!=none][height>=1440]/best[vcodec^=vp9][acodec!=none][height>=1440]/best[vcodec^=av01][acodec!=none][height>=1080]/best[vcodec^=vp9][acodec!=none][height>=1080]/best[acodec!=none][height>=1080]/bestvideo[height>=1080]+bestaudio/best"
         
         ydl_opts = {
             "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title).200s-%(id)s.%(ext)s"),
@@ -77,9 +77,12 @@ def download_worker(tid, url, format_id, audio_only_mp3=False):
                 "preferredquality": "320",
             }]
         else:
-            # Set container format intelligently to avoid forced transcoding
-            # Let yt-dlp choose best container (mkv/webm) for modern codecs, mp4 for H.264/AAC
-            ydl_opts["merge_output_format"] = "mkv"
+            # Optimize settings for best video+audio sync and quality
+            ydl_opts["merge_output_format"] = "mkv"  # Best container for high quality codecs
+            # Removed redundant remuxer as merge_output_format handles this
+            # Ensure perfect sync with additional options
+            ydl_opts["fragment_retries"] = 10
+            ydl_opts["socket_timeout"] = 30
 
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -137,8 +140,9 @@ def get_formats():
                 ext = f.get("ext", "")
                 height = f.get("height") or 0
                 width = f.get("width") or 0
-                acodec = f.get("acodec")
-                vcodec = f.get("vcodec")
+                # Normalize codec values to handle None/null cases
+                acodec = f.get("acodec") or "none"
+                vcodec = f.get("vcodec") or "none"
                 abr = f.get("abr") or 0  # Audio bitrate
                 vbr = f.get("vbr") or 0  # Video bitrate
                 fps = f.get("fps") or 0
@@ -158,24 +162,30 @@ def get_formats():
                     quality = f"{height}p"
                     quality_score += height
                     
-                    # Bonus for high resolutions
+                    # Bonus for high resolutions with enhanced scoring
                     if height >= 2160:  # 4K
-                        quality += " 4K"
-                        quality_score += 2000
+                        quality += " 4K UHD"
+                        quality_score += 4000  # Higher bonus for 4K
                     elif height >= 1440:  # 2K
-                        quality += " 2K"
-                        quality_score += 1000
+                        quality += " 2K QHD"
+                        quality_score += 2500  # Higher bonus for 2K
                     elif height >= 1080:  # FHD
-                        quality += " FHD"
-                        quality_score += 500
+                        quality += " 1080p FHD"
+                        quality_score += 1500  # Higher bonus for 1080p
                     elif height >= 720:   # HD
-                        quality += " HD"
-                        quality_score += 200
+                        quality += " 720p HD"
+                        quality_score += 400   # Modest bonus for 720p
                         
-                    # Add fps info for video
-                    if fps > 30:
+                    # Enhanced fps scoring with higher bonuses
+                    if fps >= 120:
+                        quality += f" {fps}fps HFR"
+                        quality_score += fps * 3  # Triple bonus for very high fps
+                    elif fps >= 60:
+                        quality += f" {fps}fps HFR" 
+                        quality_score += fps * 2  # Double bonus for 60fps+
+                    elif fps > 30:
                         quality += f" {fps}fps"
-                        quality_score += fps
+                        quality_score += fps * 1.5  # 1.5x bonus for >30fps
                         
                 elif f.get("format_note"): 
                     quality = f.get("format_note")
@@ -201,10 +211,27 @@ def get_formats():
                     if abr:
                         quality_score += abr // 10  # Bonus for higher audio bitrate
 
-                # Type classification
+                # Type classification with massive bonus for video+audio combined formats
                 if acodec != "none" and vcodec != "none": 
                     type_label = "Video+Audio"
-                    quality_score += 1000  # Prefer combined formats
+                    quality_score += 5000  # MASSIVE preference for combined video+audio formats
+                    
+                    # Extra bonuses for high-quality combined formats
+                    if height >= 2160:  # 4K video+audio
+                        quality_score += 3000
+                    elif height >= 1440:  # 2K video+audio  
+                        quality_score += 2000
+                    elif height >= 1080:  # 1080p video+audio
+                        quality_score += 1500
+                        
+                    # High FPS bonus for video+audio
+                    if fps >= 120:
+                        quality_score += 800
+                    elif fps >= 60:
+                        quality_score += 500
+                    elif fps >= 50:
+                        quality_score += 300
+                        
                 elif acodec != "none" and vcodec == "none": 
                     type_label = "Audio only"
                 elif acodec == "none" and vcodec != "none": 
@@ -236,11 +263,12 @@ def get_formats():
             # Sort by quality score (highest first) and filter to best options
             quality_formats.sort(key=lambda x: x["quality_score"], reverse=True)
             
-            # Keep only top quality formats to avoid overwhelming users
-            video_audio_formats = [f for f in quality_formats if f["type_label"] == "Video+Audio"][:10]
-            video_only_formats = [f for f in quality_formats if f["type_label"] == "Video only"][:5]
-            audio_only_formats = [f for f in quality_formats if f["type_label"] == "Audio only"][:5]
+            # Prioritize video+audio formats heavily, limit other types
+            video_audio_formats = [f for f in quality_formats if f["type_label"] == "Video+Audio"][:15]  # More video+audio options
+            video_only_formats = [f for f in quality_formats if f["type_label"] == "Video only"][:3]     # Fewer video-only
+            audio_only_formats = [f for f in quality_formats if f["type_label"] == "Audio only"][:3]     # Fewer audio-only
             
+            # Put video+audio formats first in the list
             fmt_list = video_audio_formats + video_only_formats + audio_only_formats
 
             # Add high-quality MP3 options

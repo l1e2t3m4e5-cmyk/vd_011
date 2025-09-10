@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <style>
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --border: #374151;
+            --border-light: #4b5563;
+            --shadow: rgba(0, 0, 0, 0.25);
+            --gradient: linear-gradient(135deg, var(--accent), #8b5cf6);
+            --radius: 12px;
+            --radius-lg: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --border-light: #cbd5e1;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            transition: var(--transition);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-tertiary);
+            transform: scale(1.1);
+        }
+
+        .main-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: 0 10px 40px var(--shadow);
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+        }
+
+        .main-card:hover {
+            box-shadow: 0 20px 60px var(--shadow);
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .url-input-wrapper {
+            position: relative;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            transition: var(--transition);
+            background: var(--bg-tertiary);
+        }
+
+        .url-input-wrapper:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .url-input-wrapper.drag-over {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.05);
+            transform: scale(1.02);
+        }
+
+        #urlInput {
+            width: 100%;
+            padding: 1rem 3rem 1rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        #urlInput::placeholder {
+            color: var(--text-muted);
+        }
+
+        .paste-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .paste-icon:hover {
+            color: var(--accent);
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover:before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: var(--gradient);
+            color: white;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            width: 100%;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .format-select-wrapper {
+            position: relative;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: var(--transition);
+        }
+
+        .format-select-wrapper.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .format-select {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .format-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .progress-section {
+            margin-top: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: var(--transition);
+        }
+
+        .progress-section.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .progress-bar-wrapper {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 1rem;
+            height: 12px;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--gradient);
+            border-radius: var(--radius);
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 20%, rgba(255, 255, 255, 0.3) 50%, transparent 80%);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-item {
+            text-align: center;
+            padding: 0.5rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+        }
+
+        .progress-item strong {
+            color: var(--text-primary);
+            display: block;
+        }
+
+        .status-message {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: var(--radius);
+            text-align: center;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: var(--transition);
+        }
+
+        .status-message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .status-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .download-link:hover {
+            color: var(--accent-hover);
+            transform: translateX(5px);
+        }
+
+        .drag-drop-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(59, 130, 246, 0.1);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .drag-drop-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .drag-drop-content {
+            background: var(--bg-secondary);
+            padding: 3rem;
+            border-radius: var(--radius-lg);
+            text-align: center;
+            border: 2px dashed var(--accent);
+            color: var(--accent);
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .main-card {
+                padding: 1.5rem;
+            }
+
+            .progress-info {
+                grid-template-columns: 1fr;
+            }
+
+            .theme-toggle {
+                top: 0.5rem;
+                right: 0.5rem;
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .video-title {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            font-weight: 600;
+            text-align: center;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span id="themeIcon">🌙</span>
+    </button>
+
+    <div class="drag-drop-overlay" id="dragOverlay">
+        <div class="drag-drop-content">
+            📁 Drop your video URL here
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎥 Video Downloader</h1>
+            <p>Download videos in your preferred format with ease</p>
+        </div>
+
+        <div class="main-card">
+            <div class="input-group">
+                <label for="urlInput">Video URL</label>
+                <div class="url-input-wrapper" id="urlWrapper">
+                    <input 
+                        type="text" 
+                        id="urlInput" 
+                        placeholder="Paste video URL here or drag and drop text"
+                        autocomplete="off"
+                    >
+                    <span class="paste-icon" onclick="pasteFromClipboard()" title="Paste from clipboard">📋</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="fetchFormats()" id="fetchBtn">
+                <span id="fetchText">Get Formats</span>
+                <span class="loading-spinner hidden" id="loadingSpinner"></span>
+            </button>
+
+            <div class="video-title hidden" id="videoTitle"></div>
+
+            <div class="format-select-wrapper" id="formatWrapper">
+                <label for="formatSelect">Choose Format</label>
+                <select class="format-select" id="formatSelect">
+                    <option value="">Select a format...</option>
+                </select>
+            </div>
+
+            <button class="btn btn-secondary hidden" id="downloadBtn" onclick="startDownload()">
+                📥 Download
+            </button>
+
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-wrapper">
+                    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                </div>
+                <div class="progress-info" id="progressInfo">
+                    <div class="progress-item">
+                        <strong id="progressPercent">0%</strong>
+                        <span>Complete</span>
+                    </div>
+                    <div class="progress-item">
+                        <strong id="progressSpeed">--</strong>
+                        <span>Speed</span>
+                    </div>
+                    <div class="progress-item">
+                        <strong id="progressETA">--</strong>
+                        <span>Time Left</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTask = null;
+        let isLight = localStorage.getItem('theme') === 'light';
+
+        // Initialize theme
+        function initTheme() {
+            if (isLight) {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.getElementById('themeIcon').textContent = '☀️';
+            }
+        }
+
+        function toggleTheme() {
+            isLight = !isLight;
+            document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+            document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌙';
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // Drag and drop functionality
+        function setupDragDrop() {
+            const urlWrapper = document.getElementById('urlWrapper');
+            const dragOverlay = document.getElementById('dragOverlay');
+            const urlInput = document.getElementById('urlInput');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            document.addEventListener('dragenter', () => {
+                dragOverlay.classList.add('show');
+            });
+
+            document.addEventListener('dragleave', (e) => {
+                if (!e.relatedTarget) {
+                    dragOverlay.classList.remove('show');
+                }
+            });
+
+            document.addEventListener('drop', (e) => {
+                dragOverlay.classList.remove('show');
+                const text = e.dataTransfer.getData('text');
+                if (text && text.includes('http')) {
+                    urlInput.value = text.trim();
+                    urlInput.focus();
+                }
+            });
+
+            urlWrapper.addEventListener('dragenter', () => {
+                urlWrapper.classList.add('drag-over');
+            });
+
+            urlWrapper.addEventListener('dragleave', () => {
+                urlWrapper.classList.remove('drag-over');
+            });
+
+            urlWrapper.addEventListener('drop', () => {
+                urlWrapper.classList.remove('drag-over');
+            });
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    document.getElementById('urlInput').value = text;
+                }
+            } catch (err) {
+                console.log('Clipboard access not available');
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.className = `status-message status-${type} show`;
+            statusEl.innerHTML = message;
+        }
+
+        function hideStatus() {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.classList.remove('show');
+        }
+
+        function formatSpeed(speed) {
+            if (!speed) return '--';
+            const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+            let unitIndex = 0;
+            while (speed >= 1024 && unitIndex < units.length - 1) {
+                speed /= 1024;
+                unitIndex++;
+            }
+            return `${speed.toFixed(1)} ${units[unitIndex]}`;
+        }
+
+        function formatTime(seconds) {
+            if (!seconds) return '--';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        async function fetchFormats() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                showStatus('Please enter a video URL', 'error');
+                return;
+            }
+
+            const fetchBtn = document.getElementById('fetchBtn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const fetchText = document.getElementById('fetchText');
+
+            fetchBtn.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            fetchText.textContent = 'Fetching...';
+            showStatus('Analyzing video...', 'info');
+
+            try {
+                const res = await fetch('/get_formats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    showStatus(`Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                // Show video title
+                const titleEl = document.getElementById('videoTitle');
+                titleEl.textContent = `📺 ${data.title}`;
+                titleEl.classList.remove('hidden');
+
+                // Populate format select
+                const formatSelect = document.getElementById('formatSelect');
+                formatSelect.innerHTML = '<option value="">Select a format...</option>';
+
+                const sortedFormats = data.formats.sort((a, b) => {
+                    const scoreA = (a.vcodec !== 'none' && a.acodec !== 'none' ? 1000 : 0) + (a.height || 0);
+                    const scoreB = (b.vcodec !== 'none' && b.acodec !== 'none' ? 1000 : 0) + (b.height || 0);
+                    return scoreB - scoreA;
+                });
+
+                sortedFormats.forEach((format, index) => {
+                    const option = document.createElement('option');
+                    option.value = format.format_id;
+                    
+                    let icon = '🎬';
+                    if (format.vcodec === 'none' && format.acodec !== 'none') icon = '🎵';
+                    if (format.ext === 'mp3') icon = '🔊';
+                    
+                    const bestTag = index === 0 ? ' [RECOMMENDED]' : '';
+                    option.textContent = `${icon} ${format.note}${bestTag}`;
+                    
+                    if (format.audio_only_mp3) {
+                        option.dataset.audioMp3 = 'true';
+                    }
+                    
+                    formatSelect.appendChild(option);
+                });
+
+                if (formatSelect.options.length > 1) {
+                    formatSelect.selectedIndex = 1; // Select first actual format
+                }
+
+                document.getElementById('formatWrapper').classList.add('show');
+                document.getElementById('downloadBtn').classList.remove('hidden');
+                showStatus('Formats loaded successfully!', 'success');
+
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, 'error');
+            } finally {
+                fetchBtn.disabled = false;
+                loadingSpinner.classList.add('hidden');
+                fetchText.textContent = 'Get Formats';
+            }
+        }
+
+        async function startDownload() {
+            const url = document.getElementById('urlInput').value.trim();
+            const formatSelect = document.getElementById('formatSelect');
+            const formatId = formatSelect.value;
+
+            if (!url || !formatId) {
+                showStatus('Please select a format', 'error');
+                return;
+            }
+
+            const audioOnlyMp3 = formatSelect.selectedOptions[0]?.dataset.audioMp3 === 'true';
+
+            try {
+                const res = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, format_id: formatId, audio_only_mp3: audioOnlyMp3 })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    showStatus(`Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                currentTask = data.task_id;
+                document.getElementById('progressSection').classList.add('show');
+                showStatus('Download started...', 'info');
+                checkProgress();
+
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkProgress() {
+            if (!currentTask) return;
+
+            try {
+                const res = await fetch(`/progress/${currentTask}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    showStatus(`Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                // Update progress bar
+                const progressBar = document.getElementById('progressBar');
+                const progressPercent = document.getElementById('progressPercent');
+                const progressSpeed = document.getElementById('progressSpeed');
+                const progressETA = document.getElementById('progressETA');
+
+                progressBar.style.width = `${data.progress}%`;
+                progressPercent.textContent = `${data.progress}%`;
+                progressSpeed.textContent = formatSpeed(data.speed);
+                progressETA.textContent = formatTime(data.eta);
+
+                if (data.status === 'finished') {
+                    showStatus(`✅ Download complete! <a href="/file/${currentTask}" class="download-link">📥 Download File</a>`, 'success');
+                    currentTask = null;
+                } else if (data.status === 'error') {
+                    showStatus(`❌ Error: ${data.message}`, 'error');
+                    currentTask = null;
+                } else {
+                    setTimeout(checkProgress, 1000);
+                }
+
+            } catch (error) {
+                showStatus(`Network error: ${error.message}`, 'error');
+                currentTask = null;
+            }
+        }
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            setupDragDrop();
+        });
+
+        // Enter key support
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                fetchFormats();
+            }
+        });
+    </script>
+</body>
+</html>
